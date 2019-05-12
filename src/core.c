@@ -11,6 +11,7 @@
 *       - PLATFORM_RPI:     Raspberry Pi 0,1,2,3 (Raspbian)
 *       - PLATFORM_WEB:     HTML5 with asm.js (Chrome, Firefox)
 *       - PLATFORM_UWP:     Windows 10 App, Windows Phone, Xbox One
+*       - PLATFORM_LIBRETRO:libretro API
 *
 *   CONFIGURATION:
 *
@@ -33,6 +34,9 @@
 *   #define PLATFORM_UWP
 *       Universal Windows Platform support, using OpenGL ES 2.0 through ANGLE on multiple Windows platforms,
 *       including Windows 10 App, Windows Phone and Xbox One platforms.
+*
+*   #define PLATFORM_LIBRETRO
+*       libretro support.
 *
 *   #define SUPPORT_DEFAULT_FONT (default)
 *       Default font is loaded on window initialization to be available for the user to render simple text.
@@ -261,6 +265,10 @@
     //#define DEFAULT_GAMEPAD_DEV     "/dev/input/eventN"
 
     #define MOUSE_SENSITIVITY         0.8f
+#endif
+
+#if defined(PLATFORM_LIBRETRO)
+    #include "external/libretro-common/include/libretro.h"
 #endif
 
 #define MAX_GAMEPADS              4         // Max number of gamepads supported

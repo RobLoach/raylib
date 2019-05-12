@@ -116,6 +116,21 @@ elseif(${PLATFORM} MATCHES "Raspberry Pi")
   set(PLATFORM_CPP "PLATFORM_RPI")
   set(GRAPHICS "GRAPHICS_API_OPENGL_ES2")
 
+elseif(${PLATFORM} MATCHES "libretro")
+  set(PLATFORM_CPP "PLATFORM_LIBRETRO")
+  set(GRAPHICS "GRAPHICS_API_OPENGL_33")
+  find_library(pthread NAMES pthread)
+  find_package(OpenGL QUIET)
+  if ("${OPENGL_LIBRARIES}" STREQUAL "")
+    set(OPENGL_LIBRARIES "GL")
+  endif()
+
+  if ("${CMAKE_SYSTEM_NAME}" MATCHES "(Net|Open)BSD")
+    find_library(OSS_LIBRARY ossaudio)
+  endif()
+
+  set(LIBS_PRIVATE m pthread ${OPENGL_LIBRARIES} ${OSS_LIBRARY})
+
 endif()
 
 if (${OPENGL_VERSION})
