@@ -525,7 +525,7 @@ RLAPI void SetShaderValueV(Shader shader, int uniformLoc, const void *value, int
 RLAPI void SetShaderValueMatrix(Shader shader, int uniformLoc, Matrix mat);       // Set shader uniform value (matrix 4x4)
 RLAPI void SetMatrixProjection(Matrix proj);                              // Set a custom projection matrix (replaces internal projection matrix)
 RLAPI void SetMatrixModelview(Matrix view);                               // Set a custom modelview matrix (replaces internal modelview matrix)
-RLAPI Matrix GetMatrixModelview();                                        // Get internal modelview matrix
+RLAPI Matrix GetMatrixModelview(void);                                    // Get internal modelview matrix
 
 // Texture maps generation (PBR)
 // NOTE: Required shaders should be provided
@@ -735,7 +735,7 @@ typedef struct DrawCall {
     int mode;                   // Drawing mode: LINES, TRIANGLES, QUADS
     int vertexCount;            // Number of vertex of the draw
     int vertexAlignment;        // Number of vertex required for index alignment (LINES, TRIANGLES)
-    //unsigned int vaoId;         // Vertex Array id to be used on the draw
+    //unsigned int vaoId;         // Vertex array id to be used on the draw
     //unsigned int shaderId;      // Shader id to be used on the draw
     unsigned int textureId;     // Texture id to be used on the draw
                                 // TODO: Support additional texture units?
@@ -782,14 +782,14 @@ static DrawCall *draws = NULL;
 static int drawsCounter = 0;
 
 // Default texture (1px white) useful for plain color polys (required by shader)
-static unsigned int defaultTextureId;
+static unsigned int defaultTextureId = 0;
 
 // Default shaders
-static unsigned int defaultVShaderId;       // Default vertex shader id (used by default shader program)
-static unsigned int defaultFShaderId;       // Default fragment shader Id (used by default shader program)
+static unsigned int defaultVShaderId = 0;   // Default vertex shader id (used by default shader program)
+static unsigned int defaultFShaderId = 0;   // Default fragment shader Id (used by default shader program)
 
-static Shader defaultShader;                // Basic shader, support vertex color and diffuse texture
-static Shader currentShader;                // Shader to be used on rendering (by default, defaultShader)
+static Shader defaultShader = { 0 };        // Basic shader, support vertex color and diffuse texture
+static Shader currentShader = { 0 };        // Shader to be used on rendering (by default, defaultShader)
 
 // Extension supported flag: VAO
 static bool vaoSupported = false;           // VAO support (OpenGL ES2 could not support VAO extension)
@@ -827,7 +827,7 @@ static PFNGLDELETEVERTEXARRAYSOESPROC glDeleteVertexArrays;
 #if defined(SUPPORT_VR_SIMULATOR)
 // VR global variables
 static VrStereoConfig vrConfig = { 0 };     // VR stereo configuration for simulator
-static RenderTexture2D stereoFbo;           // VR stereo rendering framebuffer
+static RenderTexture2D stereoFbo = { 0 };   // VR stereo rendering framebuffer
 static bool vrSimulatorReady = false;       // VR simulator ready flag
 static bool vrStereoRender = false;         // VR stereo rendering enabled/disabled flag
                                             // NOTE: This flag is useful to render data over stereo image (i.e. FPS)
@@ -835,11 +835,11 @@ static bool vrStereoRender = false;         // VR stereo rendering enabled/disab
 
 #endif  // GRAPHICS_API_OPENGL_33 || GRAPHICS_API_OPENGL_ES2
 
-static int blendMode = 0;   // Track current blending mode
+static int blendMode = 0;                   // Track current blending mode
 
 // Default framebuffer size
-static int screenWidth;     // Default framebuffer width
-static int screenHeight;    // Default framebuffer height
+static int framebufferWidth = 0;            // Default framebuffer width
+static int framebufferHeight = 0;           // Default framebuffer height
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
@@ -1019,7 +1019,7 @@ void rlOrtho(double left, double right, double bottom, double top, double znear,
 #endif
 
 // Set the viewport area (transformation from normalized device coordinates to window coordinates)
-// NOTE: Updates global variables: screenWidth, screenHeight
+// NOTE: Updates global variables: framebufferWidth, framebufferHeight
 void rlViewport(int x, int y, int width, int height)
 {
     glViewport(x, y, width, height);
@@ -1071,6 +1071,8 @@ void rlBegin(int mode)
             // for the next set of vertex to be drawn
             if (draws[drawsCounter - 1].mode == RL_LINES) draws[drawsCounter - 1].vertexAlignment = ((draws[drawsCounter - 1].vertexCount < 4)? draws[drawsCounter - 1].vertexCount : draws[drawsCounter - 1].vertexCount%4);
             else if (draws[drawsCounter - 1].mode == RL_TRIANGLES) draws[drawsCounter - 1].vertexAlignment = ((draws[drawsCounter - 1].vertexCount < 4)? 1 : (4 - (draws[drawsCounter - 1].vertexCount%4)));
+
+            else draws[drawsCounter - 1].vertexAlignment = 0;
 
             if (rlCheckBufferLimit(draws[drawsCounter - 1].vertexAlignment)) rlglDraw();
             else
@@ -1138,8 +1140,8 @@ void rlEnd(void)
     {
         // WARNING: If we are between rlPushMatrix() and rlPopMatrix() and we need to force a rlglDraw(),
         // we need to call rlPopMatrix() before to recover *currentMatrix (modelview) for the next forced draw call!
-        // Also noted that if we had multiple matrix pushed, it will require "stackCounter" pops before launching the draw
-        rlPopMatrix();
+        // If we have multiple matrix pushed, it will require "stackCounter" pops before launching the draw
+        for (int i = stackCounter; i >= 0; i--) rlPopMatrix();
         rlglDraw();
     }
 }
@@ -1243,6 +1245,8 @@ void rlEnableTexture(unsigned int id)
             if (draws[drawsCounter - 1].mode == RL_LINES) draws[drawsCounter - 1].vertexAlignment = ((draws[drawsCounter - 1].vertexCount < 4)? draws[drawsCounter - 1].vertexCount : draws[drawsCounter - 1].vertexCount%4);
             else if (draws[drawsCounter - 1].mode == RL_TRIANGLES) draws[drawsCounter - 1].vertexAlignment = ((draws[drawsCounter - 1].vertexCount < 4)? 1 : (4 - (draws[drawsCounter - 1].vertexCount%4)));
 
+            else draws[drawsCounter - 1].vertexAlignment = 0;
+
             if (rlCheckBufferLimit(draws[drawsCounter - 1].vertexAlignment)) rlglDraw();
             else
             {
@@ -1287,11 +1291,11 @@ void rlTextureParameters(unsigned int id, int param, int value)
         {
             if (value == RL_WRAP_MIRROR_CLAMP)
             {
-#if !defined(GRAPHICS_API_OPENGL_11)
-                if (!texMirrorClampSupported) TraceLog(LOG_WARNING, "Clamp mirror wrap mode not supported");
-#endif
+                if (texMirrorClampSupported) glTexParameteri(GL_TEXTURE_2D, param, value);
+                else TraceLog(LOG_WARNING, "Clamp mirror wrap mode not supported");
             }
             else glTexParameteri(GL_TEXTURE_2D, param, value);
+
         } break;
         case RL_TEXTURE_MAG_FILTER:
         case RL_TEXTURE_MIN_FILTER: glTexParameteri(GL_TEXTURE_2D, param, value); break;
@@ -1517,33 +1521,28 @@ void rlglInit(int width, int height)
     // NOTE: We don't need to check again supported extensions but we do (GLAD already dealt with that)
     glGetIntegerv(GL_NUM_EXTENSIONS, &numExt);
 
+    // Allocate numExt strings pointers
     const char **extList = RL_MALLOC(sizeof(const char *)*numExt);
+    
+    // Get extensions strings
     for (int i = 0; i < numExt; i++) extList[i] = (char *)glGetStringi(GL_EXTENSIONS, i);
 
 #elif defined(GRAPHICS_API_OPENGL_ES2)
-    char *extensions = (char *)glGetString(GL_EXTENSIONS);  // One big const string
-
-    // NOTE: We have to duplicate string because glGetString() returns a const string
-    int len = strlen(extensions) + 1;
-    char *extensionsDup = (char *)RL_MALLOC(len);
-    strcpy(extensionsDup, extensions);
-
-    // NOTE: String could be splitted using strtok() function (string.h)
-    // NOTE: strtok() modifies the passed string, it can not be const
-
     // Allocate 512 strings pointers (2 KB)
     const char **extList = RL_MALLOC(sizeof(const char *)*512);
+    
+    // Get extensions strings
+    char *extensions = (char *)glGetString(GL_EXTENSIONS);  // One big static const string returned
+    int len = strlen(extensions);
 
-    extList[numExt] = strtok(extensionsDup, " ");
-    while (extList[numExt] != NULL)
+    for (int i = 0; i < len; i++)
     {
-        numExt++;
-        extList[numExt] = strtok(NULL, " ");
+        if (i == ' ') 
+        {
+            extList[numExt] = &extensions[i + 1];
+            numExt++;
+        }
     }
-
-    RL_FREE(extensionsDup);    // Duplicated string must be deallocated
-
-    numExt -= 1;
 #endif
 
     TraceLog(LOG_INFO, "Number of supported extensions: %i", numExt);
@@ -1559,8 +1558,6 @@ void rlglInit(int width, int height)
         // NOTE: Only check on OpenGL ES, OpenGL 3.3 has VAO support as core feature
         if (strcmp(extList[i], (const char *)"GL_OES_vertex_array_object") == 0)
         {
-            vaoSupported = true;
-
             // The extension is supported by our hardware and driver, try to get related functions pointers
             // NOTE: emscripten does not support VAOs natively, it uses emulation and it reduces overall performance...
             glGenVertexArrays = (PFNGLGENVERTEXARRAYSOESPROC)eglGetProcAddress("glGenVertexArraysOES");
@@ -1568,18 +1565,8 @@ void rlglInit(int width, int height)
             glDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSOESPROC)eglGetProcAddress("glDeleteVertexArraysOES");
             //glIsVertexArray = (PFNGLISVERTEXARRAYOESPROC)eglGetProcAddress("glIsVertexArrayOES");     // NOTE: Fails in WebGL, omitted
 
-            if (glGenVertexArrays == NULL) printf("glGenVertexArrays is NULL.\n");  // WEB: ISSUE FOUND! ...but why?
-            if (glBindVertexArray == NULL) printf("glBindVertexArray is NULL.\n");  // WEB: ISSUE FOUND! ...but why?
+            if ((glGenVertexArrays != NULL) && (glBindVertexArray != NULL) && (glDeleteVertexArrays != NULL)) vaoSupported = true;
         }
-
-        // TODO: HACK REVIEW!
-        // For some reason on raylib 2.5, VAO usage breaks the build
-        // error seems related to function pointers but I can not get detailed info...
-        // Avoiding VAO usage is the only solution for now... :(
-        // Ref: https://emscripten.org/docs/porting/guidelines/function_pointer_issues.html
-    #if defined(PLATFORM_WEB)
-        vaoSupported = false;
-    #endif
 
         // Check NPOT textures support
         // NOTE: Only check on OpenGL ES, OpenGL 3.3 has NPOT textures full support as core feature
@@ -1627,6 +1614,7 @@ void rlglInit(int width, int height)
         if (strcmp(extList[i], (const char *)"GL_EXT_debug_marker") == 0) debugMarkerSupported = true;
     }
 
+    // Free extensions pointers
     RL_FREE(extList);
 
 #if defined(GRAPHICS_API_OPENGL_ES2)
@@ -1722,8 +1710,8 @@ void rlglInit(int width, int height)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);     // Clear color and depth buffers (depth buffer required for 3D)
 
     // Store screen size into global variables
-    screenWidth = width;
-    screenHeight = height;
+    framebufferWidth = width;
+    framebufferHeight = height;
 
     TraceLog(LOG_INFO, "OpenGL default states initialized successfully");
 }
@@ -2634,9 +2622,17 @@ void rlDrawMesh(Mesh mesh, Material material, Matrix transform)
     // That's because BeginMode3D() sets it an no model-drawing function modifies it, all use rlPushMatrix() and rlPopMatrix()
     Matrix matView = modelview;         // View matrix (camera)
     Matrix matProjection = projection;  // Projection matrix (perspective)
+    
+    // TODO: Matrix nightmare! Trying to combine stack matrices with view matrix and local model transform matrix..
+    // There is some problem in the order matrices are multiplied... it requires some time to figure out...
+    Matrix matStackTransform = MatrixIdentity();
+    
+    // TODO: Consider possible transform matrices in the stack
+    // Is this the right order? or should we start with the first stored matrix instead of the last one?
+    //for (int i = stackCounter; i > 0; i--) matStackTransform = MatrixMultiply(stack[i], matStackTransform);
 
-    // Calculate model-view matrix combining matModel and matView
-    Matrix matModelView = MatrixMultiply(transform, matView);           // Transform to camera-space coordinates
+    Matrix matModel = MatrixMultiply(transform, matStackTransform); // Apply local model transformation
+    Matrix matModelView = MatrixMultiply(matModel, matView);        // Transform to camera-space coordinates
     //-----------------------------------------------------
 
     // Bind active texture maps (if available)
@@ -3149,7 +3145,7 @@ void SetMatrixModelview(Matrix view)
 }
 
 // Return internal modelview matrix
-Matrix GetMatrixModelview()
+Matrix GetMatrixModelview(void)
 {
     Matrix matrix = MatrixIdentity();
 #if defined(GRAPHICS_API_OPENGL_11)
@@ -3243,7 +3239,7 @@ Texture2D GenTextureCubemap(Shader shader, Texture2D skyHDR, int size)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Reset viewport dimensions to default
-    glViewport(0, 0, screenWidth, screenHeight);
+    glViewport(0, 0, framebufferWidth, framebufferHeight);
     //glEnable(GL_CULL_FACE);
 
     // NOTE: Texture2D is a GL_TEXTURE_CUBE_MAP, not a GL_TEXTURE_2D!
@@ -3321,7 +3317,7 @@ Texture2D GenTextureIrradiance(Shader shader, Texture2D cubemap, int size)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Reset viewport dimensions to default
-    glViewport(0, 0, screenWidth, screenHeight);
+    glViewport(0, 0, framebufferWidth, framebufferHeight);
 
     irradiance.width = size;
     irradiance.height = size;
@@ -3416,7 +3412,7 @@ Texture2D GenTexturePrefilter(Shader shader, Texture2D cubemap, int size)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Reset viewport dimensions to default
-    glViewport(0, 0, screenWidth, screenHeight);
+    glViewport(0, 0, framebufferWidth, framebufferHeight);
 
     prefilter.width = size;
     prefilter.height = size;
@@ -3473,7 +3469,7 @@ Texture2D GenTextureBRDF(Shader shader, int size)
     glDeleteFramebuffers(1, &fbo);
 
     // Reset viewport dimensions to default
-    glViewport(0, 0, screenWidth, screenHeight);
+    glViewport(0, 0, framebufferWidth, framebufferHeight);
 
     brdf.width = size;
     brdf.height = size;
@@ -3516,7 +3512,7 @@ void BeginScissorMode(int x, int y, int width, int height)
     rlglDraw();             // Force drawing elements
 
     glEnable(GL_SCISSOR_TEST);
-    glScissor(x, screenHeight - (y + height), width, height);
+    glScissor(x, framebufferHeight - (y + height), width, height);
 }
 
 // End scissor mode
@@ -3535,7 +3531,7 @@ void InitVrSimulator(void)
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     // Initialize framebuffer and textures for stereo rendering
     // NOTE: Screen size should match HMD aspect ratio
-    stereoFbo = rlLoadRenderTexture(screenWidth, screenHeight, UNCOMPRESSED_R8G8B8A8, 24, false);
+    stereoFbo = rlLoadRenderTexture(framebufferWidth, framebufferHeight, UNCOMPRESSED_R8G8B8A8, 24, false);
 
     vrSimulatorReady = true;
 #else
@@ -3663,8 +3659,8 @@ void ToggleVrMode(void)
         vrStereoRender = false;
 
         // Reset viewport and default projection-modelview matrices
-        rlViewport(0, 0, screenWidth, screenHeight);
-        projection = MatrixOrtho(0.0, screenWidth, screenHeight, 0.0, 0.0, 1.0);
+        rlViewport(0, 0, framebufferWidth, framebufferHeight);
+        projection = MatrixOrtho(0.0, framebufferWidth, framebufferHeight, 0.0, 0.0, 1.0);
         modelview = MatrixIdentity();
     }
     else vrStereoRender = true;
@@ -3702,12 +3698,12 @@ void EndVrDrawing(void)
         rlClearScreenBuffers();         // Clear current framebuffer
 
         // Set viewport to default framebuffer size (screen size)
-        rlViewport(0, 0, screenWidth, screenHeight);
+        rlViewport(0, 0, framebufferWidth, framebufferHeight);
 
         // Let rlgl reconfigure internal matrices
         rlMatrixMode(RL_PROJECTION);                            // Enable internal projection matrix
         rlLoadIdentity();                                       // Reset internal projection matrix
-        rlOrtho(0.0, screenWidth, screenHeight, 0.0, 0.0, 1.0); // Recalculate internal projection matrix
+        rlOrtho(0.0, framebufferWidth, framebufferHeight, 0.0, 0.0, 1.0); // Recalculate internal projection matrix
         rlMatrixMode(RL_MODELVIEW);                             // Enable internal modelview matrix
         rlLoadIdentity();                                       // Reset internal modelview matrix
 
@@ -3750,8 +3746,8 @@ void EndVrDrawing(void)
         currentShader = defaultShader;
 
         // Reset viewport and default projection-modelview matrices
-        rlViewport(0, 0, screenWidth, screenHeight);
-        projection = MatrixOrtho(0.0, screenWidth, screenHeight, 0.0, 0.0, 1.0);
+        rlViewport(0, 0, framebufferWidth, framebufferHeight);
+        projection = MatrixOrtho(0.0, framebufferWidth, framebufferHeight, 0.0, 0.0, 1.0);
         modelview = MatrixIdentity();
 
         rlDisableDepthTest();
@@ -4417,7 +4413,7 @@ static void SetStereoView(int eye, Matrix matProjection, Matrix matModelView)
     Matrix eyeModelView = matModelView;
 
     // Setup viewport and projection/modelview matrices using tracking data
-    rlViewport(eye*screenWidth/2, 0, screenWidth/2, screenHeight);
+    rlViewport(eye*framebufferWidth/2, 0, framebufferWidth/2, framebufferHeight);
 
     // Apply view offset to modelview matrix
     eyeModelView = MatrixMultiply(matModelView, vrConfig.eyesViewOffset[eye]);

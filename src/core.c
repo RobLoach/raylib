@@ -54,6 +54,11 @@
 *   #define SUPPORT_TOUCH_AS_MOUSE
 *       Touch input and mouse input are shared. Mouse functions also return touch information.
 *
+*   #define SUPPORT_SSH_KEYBOARD_RPI (Raspberry Pi only)
+*       Reconfigure standard input to receive key inputs, works with SSH connection.
+*       WARNING: Reconfiguring standard input could lead to undesired effects, like breaking other running processes or
+*       blocking the device is not restored properly. Use with care.
+*
 *   #define SUPPORT_BUSY_WAIT_LOOP
 *       Use busy wait loop for timing sync, if not defined, a high-resolution timer is setup and used
 *
@@ -125,7 +130,7 @@
     #include "gestures.h"       // Gestures detection functionality
 #endif
 
-#if defined(SUPPORT_CAMERA_SYSTEM) && !defined(PLATFORM_ANDROID)
+#if defined(SUPPORT_CAMERA_SYSTEM)
     #define CAMERA_IMPLEMENTATION
     #include "camera.h"         // Camera system functionality
 #endif
@@ -303,7 +308,8 @@ static int currentWidth, currentHeight;         // Current render width and heig
 static int renderOffsetX = 0;                   // Offset X from render area (must be divided by 2)
 static int renderOffsetY = 0;                   // Offset Y from render area (must be divided by 2)
 static bool fullscreen = false;                 // Fullscreen mode (useful only for PLATFORM_DESKTOP)
-static Matrix screenScaling;                    // Matrix to scale screen (framebuffer rendering)
+static bool alwaysRun = false;                  // Keep window update/draw running on minimized
+static Matrix screenScaling = { 0 };            // Matrix to scale screen (framebuffer rendering)
 
 #if defined(PLATFORM_RPI)
 static EGL_DISPMANX_WINDOW_T nativeWindow;      // Native window (graphic device)
@@ -314,7 +320,7 @@ static EGLDisplay display;                      // Native display device (physic
 static EGLSurface surface;                      // Surface to draw on, framebuffers (connected to context)
 static EGLContext context;                      // Graphic context, mode in which drawing can be done
 static EGLConfig config;                        // Graphic config
-static uint64_t baseTime;                       // Base time measure for hi-res timer
+static uint64_t baseTime = 0;                   // Base time measure for hi-res timer
 static bool windowShouldClose = false;          // Flag to set window for closing
 #endif
 
@@ -344,7 +350,7 @@ static int exitKey = KEY_ESCAPE;                // Default exit key (ESC)
 #if defined(PLATFORM_RPI)
 // NOTE: For keyboard we will use the standard input (but reconfigured...)
 static struct termios defaultKeyboardSettings;  // Used to store default keyboard settings
-static int defaultKeyboardMode;                 // Used to store default keyboard mode
+static int defaultKeyboardMode = 0;             // Used to store default keyboard mode
 #endif
 
 // Mouse states
@@ -386,8 +392,8 @@ typedef struct{
     char Tail;
 } KeyEventFifo;
 
-static KeyEventFifo lastKeyPressedEvdev;        // Buffer for holding keydown events as they arrive (Needed due to multitreading of event workers)
-static char currentKeyStateEvdev[512] = { 0 };  // Registers current frame key state from event based driver (Needs to be seperate because the legacy console based method clears keys on every frame)
+static KeyEventFifo lastKeyPressedEvdev = { 0 }; // Buffer for holding keydown events as they arrive (Needed due to multitreading of event workers)
+static char currentKeyStateEvdev[512] = { 0 };   // Registers current frame key state from event based driver (Needs to be seperate because the legacy console based method clears keys on every frame)
 
 #endif
 #if defined(PLATFORM_WEB)
@@ -424,7 +430,7 @@ static double targetTime = 0.0;             // Desired time for one frame, if 0 
 
 // Config internal variables
 //-----------------------------------------------------------------------------------
-static unsigned char configFlags = 0;       // Configuration flags (bit based)
+static unsigned int configFlags = 0;        // Configuration flags (bit based)
 static bool showLogo = false;               // Track if showing logo at init is enabled
 
 static char **dropFilesPath;                // Store dropped files paths as strings
@@ -447,8 +453,8 @@ static bool gifRecording = false;           // GIF recording state
 // Other Modules Functions Declaration (required by core)
 //----------------------------------------------------------------------------------
 #if defined(SUPPORT_DEFAULT_FONT)
-extern void LoadDefaultFont(void);          // [Module: text] Loads default font on InitWindow()
-extern void UnloadDefaultFont(void);        // [Module: text] Unloads default font from GPU memory
+extern void LoadFontDefault(void);          // [Module: text] Loads default font on InitWindow()
+extern void UnloadFontDefault(void);        // [Module: text] Unloads default font from GPU memory
 #endif
 
 //----------------------------------------------------------------------------------
@@ -497,16 +503,22 @@ static EM_BOOL EmscriptenGamepadCallback(int eventType, const EmscriptenGamepadE
 #endif
 
 #if defined(PLATFORM_RPI)
+#if defined(SUPPORT_SSH_KEYBOARD_RPI)
+static void InitKeyboard(void);                         // Init raw keyboard system (standard input reading)
+static void ProcessKeyboard(void);                      // Process keyboard events
+static void RestoreKeyboard(void);                      // Restore keyboard system
+#else
+static void InitTerminal(void);                         // Init terminal (block echo and signal short cuts)
+static void RestoreTerminal(void);                      // Restore terminal
+#endif
+
 static void InitEvdevInput(void);                       // Evdev inputs initialization
 static void EventThreadSpawn(char *device);             // Identifies a input device and spawns a thread to handle it if needed
 static void *EventThread(void *arg);                    // Input device events reading thread
 
-static void InitKeyboard(void);                         // Init raw keyboard system (standard input reading)
-static void ProcessKeyboard(void);                      // Process keyboard events
-static void RestoreKeyboard(void);                      // Restore keyboard system
 static void InitGamepad(void);                          // Init raw gamepad input
 static void *GamepadThread(void *arg);                  // Mouse reading thread
-#endif
+#endif  // PLATFORM_RPI
 
 #if defined(_WIN32)
     // NOTE: We include Sleep() function signature here to avoid windows.h inclusion
@@ -537,7 +549,52 @@ struct android_app *GetAndroidApp(void)
     return androidApp;
 }
 #endif
+#if defined(PLATFORM_RPI) && !defined(SUPPORT_SSH_KEYBOARD_RPI)
+// Init terminal (block echo and signal short cuts)
+static void InitTerminal(void)
+{
+    TraceLog(LOG_INFO, "Reconfigure Terminal ...");
+    // Save terminal keyboard settings and reconfigure terminal with new settings
+    struct termios keyboardNewSettings;
+    tcgetattr(STDIN_FILENO, &defaultKeyboardSettings);    // Get current keyboard settings
+    keyboardNewSettings = defaultKeyboardSettings;
 
+    // New terminal settings for keyboard: turn off buffering (non-canonical mode), echo
+    // NOTE: ISIG controls if ^C and ^Z generate break signals or not
+    keyboardNewSettings.c_lflag &= ~(ICANON | ECHO | ISIG);
+    keyboardNewSettings.c_cc[VMIN] = 1;
+    keyboardNewSettings.c_cc[VTIME] = 0;
+
+    // Set new keyboard settings (change occurs immediately)
+    tcsetattr(STDIN_FILENO, TCSANOW, &keyboardNewSettings);
+
+    // Save old keyboard mode to restore it at the end
+    if (ioctl(STDIN_FILENO, KDGKBMODE, &defaultKeyboardMode) < 0)
+    {
+        // NOTE: It could mean we are using a remote keyboard through ssh or from the desktop
+        TraceLog(LOG_WARNING, "Could not change keyboard mode (Not a local Terminal)");
+    }
+    else
+    {
+        
+        ioctl(STDIN_FILENO, KDSKBMODE, K_XLATE);
+    }
+
+    // Register terminal restore when program finishes
+    atexit(RestoreTerminal);
+}
+// Restore terminal
+static void RestoreTerminal(void)
+{
+    TraceLog(LOG_INFO, "Restore Terminal ...");
+    
+    // Reset to default keyboard settings
+    tcsetattr(STDIN_FILENO, TCSANOW, &defaultKeyboardSettings);
+
+    // Reconfigure keyboard to default mode
+    ioctl(STDIN_FILENO, KDSKBMODE, defaultKeyboardMode);
+}
+#endif
 // Initialize window and OpenGL context
 // NOTE: data parameter could be used to pass any kind of required data to the initialization
 void InitWindow(int width, int height, const char *title)
@@ -612,14 +669,18 @@ void InitWindow(int width, int height, const char *title)
 #if defined(SUPPORT_DEFAULT_FONT)
     // Load default font
     // NOTE: External function (defined in module: text)
-    LoadDefaultFont();
+    LoadFontDefault();
 #endif
 
 #if defined(PLATFORM_RPI)
     // Init raw input system
     InitEvdevInput();   // Evdev inputs initialization
-    InitKeyboard();     // Keyboard init
     InitGamepad();      // Gamepad init
+#if defined(SUPPORT_SSH_KEYBOARD_RPI)
+    InitKeyboard();     // Keyboard init
+#else
+    InitTerminal();     // Terminal init
+#endif
 #endif
 
 #if defined(PLATFORM_WEB)
@@ -666,7 +727,7 @@ void CloseWindow(void)
 #endif
 
 #if defined(SUPPORT_DEFAULT_FONT)
-    UnloadDefaultFont();
+    UnloadFontDefault();
 #endif
 
     rlglClose();                // De-init rlgl
@@ -712,12 +773,13 @@ void CloseWindow(void)
 
     for (int i = 0; i < sizeof(eventWorkers)/sizeof(InputEventWorker); ++i)
     {
-        if (eventWorkers[i].threadId == 0)
+        if (eventWorkers[i].threadId)
         {
             pthread_join(eventWorkers[i].threadId, NULL);
         }
     }
-    pthread_join(gamepadThreadId, NULL);
+    
+    if (gamepadThreadId) pthread_join(gamepadThreadId, NULL);
 #endif
 
     TraceLog(LOG_INFO, "Window closed successfully");
@@ -746,7 +808,7 @@ bool WindowShouldClose(void)
     if (windowReady)
     {
         // While window minimized, stop loop execution
-        while (windowMinimized) glfwWaitEvents();
+        while (!alwaysRun && windowMinimized) glfwWaitEvents();
 
         return (glfwWindowShouldClose(window));
     }
@@ -1606,12 +1668,13 @@ Color Fade(Color color, float alpha)
 }
 
 // Setup window configuration flags (view FLAGS)
-void SetConfigFlags(unsigned char flags)
+void SetConfigFlags(unsigned int flags)
 {
     configFlags = flags;
 
     if (configFlags & FLAG_SHOW_LOGO) showLogo = true;
     if (configFlags & FLAG_FULLSCREEN_MODE) fullscreen = true;
+    if (configFlags & FLAG_WINDOW_ALWAYS_RUN) alwaysRun = true;
 }
 
 // NOTE TraceLog() function is located in [utils.h]
@@ -1638,8 +1701,8 @@ void TakeScreenshot(const char *fileName)
 
 #if defined(PLATFORM_WEB)
     // Download file from MEMFS (emscripten memory filesystem)
-    // SaveFileFromMEMFSToDisk() function is defined in raylib/templates/web_shel/shell.html
-    emscripten_run_script(TextFormat("SaveFileFromMEMFSToDisk('%s','%s')", GetFileName(path), GetFileName(path)));
+    // saveFileFromMEMFSToDisk() function is defined in raylib/src/shell.html
+    emscripten_run_script(TextFormat("saveFileFromMEMFSToDisk('%s','%s')", GetFileName(path), GetFileName(path)));
 #endif
 
     TraceLog(LOG_INFO, "Screenshot taken: %s", path);
@@ -1950,7 +2013,7 @@ int StorageLoadValue(int position)
 }
 
 // Open URL with default system browser (if available)
-// NOTE: This function is onlyl safe to use if you control the URL given.
+// NOTE: This function is only safe to use if you control the URL given.
 // A user could craft a malicious string performing another action.
 // Only call this function yourself not with user input or make sure to check the string yourself.
 // CHECK: https://github.com/raysan5/raylib/issues/686
@@ -2171,11 +2234,12 @@ bool IsMouseButtonPressed(int button)
     if ((currentMouseState[button] != previousMouseState[button]) && (currentMouseState[button] == 1)) pressed = true;
 #endif
 
+/*
 #if defined(PLATFORM_WEB)
     Vector2 pos = GetTouchPosition(0);
     if ((pos.x > 0) && (pos.y > 0)) pressed = true;    // There was a touch!
 #endif
-
+*/
     return pressed;
 }
 
@@ -2247,13 +2311,14 @@ Vector2 GetMousePosition(void)
 #else
     position = (Vector2){ (mousePosition.x + mouseOffset.x)*mouseScale.x, (mousePosition.y + mouseOffset.y)*mouseScale.y };
 #endif
+/*
 #if defined(PLATFORM_WEB)
     Vector2 pos = GetTouchPosition(0);
 
     // Touch position has priority over mouse position
     if ((pos.x > 0) && (pos.y > 0)) position = pos; // There was a touch!
 #endif
-
+*/
     return position;
 }
 
@@ -2362,8 +2427,6 @@ static bool InitGraphicsDevice(int width, int height)
 {
     screenWidth = width;        // User desired width
     screenHeight = height;      // User desired height
-    currentWidth = width;
-    currentHeight = height;
 
     screenScaling = MatrixIdentity();   // No draw scaling required by default
 
@@ -2401,6 +2464,9 @@ static bool InitGraphicsDevice(int width, int height)
     if (screenWidth <= 0) screenWidth = displayWidth;
     if (screenHeight <= 0) screenHeight = displayHeight;
 #endif  // PLATFORM_DESKTOP
+
+    currentWidth = screenWidth;
+    currentHeight = screenHeight;
 
 #if defined(PLATFORM_WEB)
     displayWidth = screenWidth;
@@ -2466,16 +2532,20 @@ static bool InitGraphicsDevice(int width, int height)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
         glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-        glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_NATIVE_CONTEXT_API);     // Alternative: GLFW_EGL_CONTEXT_API (ANGLE)
+#if defined(PLATFORM_DESKTOP)
+        glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);   
+#else
+        glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_NATIVE_CONTEXT_API); 
+#endif
     }
 
     if (fullscreen)
     {
         // Obtain recommended displayWidth/displayHeight from a valid videomode for the monitor
-        int count;
+        int count = 0;
         const GLFWvidmode *modes = glfwGetVideoModes(glfwGetPrimaryMonitor(), &count);
 
-        // Get closest videomode to desired screenWidth/screenHeight
+        // Get closest video mode to desired screenWidth/screenHeight
         for (int i = 0; i < count; i++)
         {
             if (modes[i].width >= screenWidth)
@@ -3550,7 +3620,7 @@ static void PollInputEvents(void)
     }
 #endif
 
-#if defined(PLATFORM_RPI)
+#if defined(PLATFORM_RPI) && defined(SUPPORT_SSH_KEYBOARD_RPI)
     // NOTE: Keyboard reading could be done using input_event(s) reading or just read from stdin,
     // we now use both methods inside here. 2nd method is still used for legacy purposes (Allows for input trough SSH console)
     ProcessKeyboard();
@@ -3606,8 +3676,8 @@ static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, i
 
             #if defined(PLATFORM_WEB)
                 // Download file from MEMFS (emscripten memory filesystem)
-                // SaveFileFromMEMFSToDisk() function is defined in raylib/templates/web_shel/shell.html
-                emscripten_run_script(TextFormat("SaveFileFromMEMFSToDisk('%s','%s')", TextFormat("screenrec%03i.gif", screenshotCounter - 1), TextFormat("screenrec%03i.gif", screenshotCounter - 1)));
+                // saveFileFromMEMFSToDisk() function is defined in raylib/templates/web_shel/shell.html
+                emscripten_run_script(TextFormat("saveFileFromMEMFSToDisk('%s','%s')", TextFormat("screenrec%03i.gif", screenshotCounter - 1), TextFormat("screenrec%03i.gif", screenshotCounter - 1)));
             #endif
 
                 TraceLog(LOG_INFO, "End animated GIF recording");
@@ -3819,7 +3889,7 @@ static void AndroidCommandCallback(struct android_app *app, int32_t cmd)
                 #if defined(SUPPORT_DEFAULT_FONT)
                     // Load default font
                     // NOTE: External function (defined in module: text)
-                    LoadDefaultFont();
+                    LoadFontDefault();
                 #endif
 
                     // TODO: GPU assets reload in case of lost focus (lost context)
@@ -4187,6 +4257,8 @@ static EM_BOOL EmscriptenGamepadCallback(int eventType, const EmscriptenGamepadE
 #endif
 
 #if defined(PLATFORM_RPI)
+
+#if defined(SUPPORT_SSH_KEYBOARD_RPI)
 // Initialize Keyboard system (using standard input)
 static void InitKeyboard(void)
 {
@@ -4347,6 +4419,7 @@ static void RestoreKeyboard(void)
     // Reconfigure keyboard to default mode
     ioctl(STDIN_FILENO, KDSKBMODE, defaultKeyboardMode);
 }
+#endif      //SUPPORT_SSH_KEYBOARD_RPI
 
 // Initialise user input from evdev(/dev/input/event<N>) this means mouse, keyboard or gamepad devices
 static void InitEvdevInput(void)
@@ -4720,6 +4793,7 @@ static void *EventThread(void *arg)
                     // Make sure we got a valid keycode
                     if ((keycode > 0) && (keycode < sizeof(currentKeyState)))
                     {
+                        /* Disabled buffer !!
                         // Store the key information for raylib to later use
                         currentKeyStateEvdev[keycode] = event.value;
                         if (event.value > 0)
@@ -4729,7 +4803,22 @@ static void *EventThread(void *arg)
                             lastKeyPressedEvdev.Head = (lastKeyPressedEvdev.Head + 1) & 0x07;   // Increment the head pointer forwards and binary wraparound after 7 (fifo is 8 elements long)
                             // TODO: This fifo is not fully threadsafe with multiple writers, so multiple keyboards hitting a key at the exact same time could miss a key (double write to head before it was incremented)
                         }
+                        */
+                        
+                        currentKeyState[keycode] = event.value;
+                        if (event.value == 1) lastKeyPressed = keycode;     // Register last key pressed
 
+                        #if defined(SUPPORT_SCREEN_CAPTURE)
+                            // Check screen capture key (raylib key: KEY_F12)
+                            if (currentKeyState[301] == 1)
+                            {
+                                TakeScreenshot(FormatText("screenshot%03i.png", screenshotCounter));
+                                screenshotCounter++;
+                            }
+                        #endif
+
+                        if (currentKeyState[exitKey] == 1) windowShouldClose = true;
+    
                         TraceLog(LOG_DEBUG, "KEY%s ScanCode: %4i KeyCode: %4i",event.value == 0 ? "UP":"DOWN", event.code, keycode);
                     }
                 }
@@ -4745,7 +4834,7 @@ static void *EventThread(void *arg)
             // Gesture update
             if (gestureUpdate)
             {
-#if defined(SUPPORT_GESTURES_SYSTEM)
+            #if defined(SUPPORT_GESTURES_SYSTEM)
                 GestureEvent gestureEvent = { 0 };
 
                 gestureEvent.pointCount = 0;
@@ -4767,7 +4856,7 @@ static void *EventThread(void *arg)
                 gestureEvent.position[3] = touchPosition[3];
 
                 ProcessGestureEvent(gestureEvent);
-#endif
+            #endif
             }
         }
         else

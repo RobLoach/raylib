@@ -33,7 +33,7 @@
 *       [core] rgif (Charlie Tangora, Ramon Santamaria) for GIF recording
 *       [textures] stb_image (Sean Barret) for images loading (BMP, TGA, PNG, JPEG, HDR...)
 *       [textures] stb_image_write (Sean Barret) for image writting (BMP, TGA, PNG, JPG)
-*       [textures] stb_image_resize (Sean Barret) for image resizing algorythms
+*       [textures] stb_image_resize (Sean Barret) for image resizing algorithms
 *       [textures] stb_perlin (Sean Barret) for Perlin noise image generation
 *       [text] stb_truetype (Sean Barret) for ttf fonts loading
 *       [text] stb_rect_pack (Sean Barret) for rectangles packing
@@ -114,40 +114,40 @@
 // NOTE: MSC C++ compiler does not support compound literals (C99 feature)
 // Plain structures in C++ (without constructors) can be initialized from { } initializers.
 #if defined(__cplusplus)
-    #define CLITERAL
+    #define CLITERAL(type)      type
 #else
-    #define CLITERAL    (Color)
+    #define CLITERAL(type)      (type)
 #endif
 
 // Some Basic Colors
 // NOTE: Custom raylib color palette for amazing visuals on WHITE background
-#define LIGHTGRAY  CLITERAL{ 200, 200, 200, 255 }   // Light Gray
-#define GRAY       CLITERAL{ 130, 130, 130, 255 }   // Gray
-#define DARKGRAY   CLITERAL{ 80, 80, 80, 255 }      // Dark Gray
-#define YELLOW     CLITERAL{ 253, 249, 0, 255 }     // Yellow
-#define GOLD       CLITERAL{ 255, 203, 0, 255 }     // Gold
-#define ORANGE     CLITERAL{ 255, 161, 0, 255 }     // Orange
-#define PINK       CLITERAL{ 255, 109, 194, 255 }   // Pink
-#define RED        CLITERAL{ 230, 41, 55, 255 }     // Red
-#define MAROON     CLITERAL{ 190, 33, 55, 255 }     // Maroon
-#define GREEN      CLITERAL{ 0, 228, 48, 255 }      // Green
-#define LIME       CLITERAL{ 0, 158, 47, 255 }      // Lime
-#define DARKGREEN  CLITERAL{ 0, 117, 44, 255 }      // Dark Green
-#define SKYBLUE    CLITERAL{ 102, 191, 255, 255 }   // Sky Blue
-#define BLUE       CLITERAL{ 0, 121, 241, 255 }     // Blue
-#define DARKBLUE   CLITERAL{ 0, 82, 172, 255 }      // Dark Blue
-#define PURPLE     CLITERAL{ 200, 122, 255, 255 }   // Purple
-#define VIOLET     CLITERAL{ 135, 60, 190, 255 }    // Violet
-#define DARKPURPLE CLITERAL{ 112, 31, 126, 255 }    // Dark Purple
-#define BEIGE      CLITERAL{ 211, 176, 131, 255 }   // Beige
-#define BROWN      CLITERAL{ 127, 106, 79, 255 }    // Brown
-#define DARKBROWN  CLITERAL{ 76, 63, 47, 255 }      // Dark Brown
+#define LIGHTGRAY  CLITERAL(Color){ 200, 200, 200, 255 }   // Light Gray
+#define GRAY       CLITERAL(Color){ 130, 130, 130, 255 }   // Gray
+#define DARKGRAY   CLITERAL(Color){ 80, 80, 80, 255 }      // Dark Gray
+#define YELLOW     CLITERAL(Color){ 253, 249, 0, 255 }     // Yellow
+#define GOLD       CLITERAL(Color){ 255, 203, 0, 255 }     // Gold
+#define ORANGE     CLITERAL(Color){ 255, 161, 0, 255 }     // Orange
+#define PINK       CLITERAL(Color){ 255, 109, 194, 255 }   // Pink
+#define RED        CLITERAL(Color){ 230, 41, 55, 255 }     // Red
+#define MAROON     CLITERAL(Color){ 190, 33, 55, 255 }     // Maroon
+#define GREEN      CLITERAL(Color){ 0, 228, 48, 255 }      // Green
+#define LIME       CLITERAL(Color){ 0, 158, 47, 255 }      // Lime
+#define DARKGREEN  CLITERAL(Color){ 0, 117, 44, 255 }      // Dark Green
+#define SKYBLUE    CLITERAL(Color){ 102, 191, 255, 255 }   // Sky Blue
+#define BLUE       CLITERAL(Color){ 0, 121, 241, 255 }     // Blue
+#define DARKBLUE   CLITERAL(Color){ 0, 82, 172, 255 }      // Dark Blue
+#define PURPLE     CLITERAL(Color){ 200, 122, 255, 255 }   // Purple
+#define VIOLET     CLITERAL(Color){ 135, 60, 190, 255 }    // Violet
+#define DARKPURPLE CLITERAL(Color){ 112, 31, 126, 255 }    // Dark Purple
+#define BEIGE      CLITERAL(Color){ 211, 176, 131, 255 }   // Beige
+#define BROWN      CLITERAL(Color){ 127, 106, 79, 255 }    // Brown
+#define DARKBROWN  CLITERAL(Color){ 76, 63, 47, 255 }      // Dark Brown
 
-#define WHITE      CLITERAL{ 255, 255, 255, 255 }   // White
-#define BLACK      CLITERAL{ 0, 0, 0, 255 }         // Black
-#define BLANK      CLITERAL{ 0, 0, 0, 0 }           // Blank (Transparent)
-#define MAGENTA    CLITERAL{ 255, 0, 255, 255 }     // Magenta
-#define RAYWHITE   CLITERAL{ 245, 245, 245, 255 }   // My own White (raylib logo)
+#define WHITE      CLITERAL(Color){ 255, 255, 255, 255 }   // White
+#define BLACK      CLITERAL(Color){ 0, 0, 0, 255 }         // Black
+#define BLANK      CLITERAL(Color){ 0, 0, 0, 0 }           // Blank (Transparent)
+#define MAGENTA    CLITERAL(Color){ 255, 0, 255, 255 }     // Magenta
+#define RAYWHITE   CLITERAL(Color){ 245, 245, 245, 255 }   // My own White (raylib logo)
 
 // Temporal hack to avoid breaking old codebases using
 // deprecated raylib implementation of these functions
@@ -263,18 +263,18 @@ typedef struct NPatchInfo {
 // Font character info
 typedef struct CharInfo {
     int value;              // Character value (Unicode)
-    Rectangle rec;          // Character rectangle in sprite font
     int offsetX;            // Character offset X when drawing
     int offsetY;            // Character offset Y when drawing
     int advanceX;           // Character advance position X
-    unsigned char *data;    // Character pixel data (grayscale)
+    Image image;            // Character image data
 } CharInfo;
 
 // Font type, includes texture and charSet array data
 typedef struct Font {
-    Texture2D texture;      // Font texture
     int baseSize;           // Base size (default chars height)
     int charsCount;         // Number of characters
+    Texture2D texture;      // Characters texture atlas
+    Rectangle *recs;        // Characters rectangles in texture
     CharInfo *chars;        // Characters info data
 } Font;
 
@@ -406,39 +406,43 @@ typedef struct BoundingBox {
 
 // Wave type, defines audio wave data
 typedef struct Wave {
-    unsigned int sampleCount;   // Number of samples
-    unsigned int sampleRate;    // Frequency (samples per second)
-    unsigned int sampleSize;    // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
-    unsigned int channels;      // Number of channels (1-mono, 2-stereo)
-    void *data;                 // Buffer data pointer
+    unsigned int sampleCount;       // Total number of samples
+    unsigned int sampleRate;        // Frequency (samples per second)
+    unsigned int sampleSize;        // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
+    unsigned int channels;          // Number of channels (1-mono, 2-stereo)
+    void *data;                     // Buffer data pointer
 } Wave;
 
-// Sound source type
-typedef struct Sound {
-    void *audioBuffer;      // Pointer to internal data used by the audio system
-
-    unsigned int source;    // Audio source id
-    unsigned int buffer;    // Audio buffer id
-    int format;             // Audio format specifier
-} Sound;
-
-// Music type (file streaming from memory)
-// NOTE: Anything longer than ~10 seconds should be streamed
-typedef struct MusicData *Music;
+typedef struct rAudioBuffer rAudioBuffer;
 
 // Audio stream type
 // NOTE: Useful to create custom audio streams not bound to a specific file
 typedef struct AudioStream {
-    unsigned int sampleRate;    // Frequency (samples per second)
-    unsigned int sampleSize;    // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
-    unsigned int channels;      // Number of channels (1-mono, 2-stereo)
+    unsigned int sampleRate;        // Frequency (samples per second)
+    unsigned int sampleSize;        // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
+    unsigned int channels;          // Number of channels (1-mono, 2-stereo)
 
-    void *audioBuffer;          // Pointer to internal data used by the audio system.
-
-    int format;                 // Audio format specifier
-    unsigned int source;        // Audio source id
-    unsigned int buffers[2];    // Audio buffers (double buffering)
+    rAudioBuffer *buffer;           // Pointer to internal data used by the audio system
 } AudioStream;
+
+// Sound source type
+typedef struct Sound {
+    unsigned int sampleCount;       // Total number of samples
+    AudioStream stream;             // Audio stream
+} Sound;
+
+// Music stream type (audio file streaming from memory)
+// NOTE: Anything longer than ~10 seconds should be streamed
+typedef struct Music {
+    int ctxType;                    // Type of music context (audio filetype)
+    void *ctxData;                  // Audio context data, depends on type
+    
+    unsigned int sampleCount;       // Total number of samples
+    unsigned int sampleLeft;        // Number of samples left to end
+    unsigned int loopCount;         // Loops count (times music will play), 0 means infinite loop
+
+    AudioStream stream;             // Audio stream
+} Music;
 
 // Head-Mounted-Display device parameters
 typedef struct VrDeviceInfo {
@@ -466,6 +470,7 @@ typedef enum {
     FLAG_WINDOW_UNDECORATED = 8,    // Set to disable window decoration (frame and buttons)
     FLAG_WINDOW_TRANSPARENT = 16,   // Set to allow transparent window
     FLAG_WINDOW_HIDDEN      = 128,  // Set to create the window initially hidden
+    FLAG_WINDOW_ALWAYS_RUN  = 256,  // Set to allow windows running while minimized
     FLAG_MSAA_4X_HINT       = 32,   // Set to try enabling MSAA 4X
     FLAG_VSYNC_HINT         = 64    // Set to try enabling V-Sync on GPU
 } ConfigFlag;
@@ -630,7 +635,7 @@ typedef enum {
     GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
     GAMEPAD_BUTTON_LEFT_FACE_DOWN,
     GAMEPAD_BUTTON_LEFT_FACE_LEFT,
-  
+
     // This is normally a DPAD
     GAMEPAD_BUTTON_RIGHT_FACE_UP,
     GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
@@ -924,7 +929,7 @@ RLAPI Color GetColor(int hexValue);                               // Returns a C
 RLAPI Color Fade(Color color, float alpha);                       // Color fade-in or fade-out, alpha goes from 0.0f to 1.0f
 
 // Misc. functions
-RLAPI void SetConfigFlags(unsigned char flags);                   // Setup window configuration flags (view FLAGS)
+RLAPI void SetConfigFlags(unsigned int flags);                    // Setup window configuration flags (view FLAGS)
 RLAPI void SetTraceLogLevel(int logType);                         // Set the current threshold (minimum) log level
 RLAPI void SetTraceLogExit(int logType);                          // Set the exit threshold (minimum) log level
 RLAPI void SetTraceLogCallback(TraceLogCallback callback);        // Set a trace log callback to enable custom logging
@@ -1054,6 +1059,7 @@ RLAPI void DrawRectangleRoundedLines(Rectangle rec, float roundness, int segment
 RLAPI void DrawTriangle(Vector2 v1, Vector2 v2, Vector2 v3, Color color);                                // Draw a color-filled triangle
 RLAPI void DrawTriangleLines(Vector2 v1, Vector2 v2, Vector2 v3, Color color);                           // Draw triangle outline
 RLAPI void DrawTriangleFan(Vector2 *points, int numPoints, Color color);                                 // Draw a triangle fan defined by points
+RLAPI void DrawTriangleStrip(Vector2 *points, int pointsCount, Color color);                             // Draw a triangle strip defined by points
 RLAPI void DrawPoly(Vector2 center, int sides, float radius, float rotation, Color color);               // Draw a regular polygon (Vector version)
 
 RLAPI void SetShapesTexture(Texture2D texture, Rectangle source);                                        // Define default texture used to draw shapes
@@ -1094,6 +1100,7 @@ RLAPI void UpdateTexture(Texture2D texture, const void *pixels);                
 
 // Image manipulation functions
 RLAPI Image ImageCopy(Image image);                                                                      // Create an image duplicate (useful for transformations)
+RLAPI Image ImageFromImage(Image image, Rectangle rec);                                                  // Create an image from another image piece
 RLAPI void ImageToPOT(Image *image, Color fillColor);                                                    // Convert image to POT (power-of-two)
 RLAPI void ImageFormat(Image *image, int newFormat);                                                     // Convert image data to desired format
 RLAPI void ImageAlphaMask(Image *image, Image alphaMask);                                                // Apply alpha mask to image
@@ -1109,7 +1116,7 @@ RLAPI void ImageDither(Image *image, int rBpp, int gBpp, int bBpp, int aBpp);   
 RLAPI Color *ImageExtractPalette(Image image, int maxPaletteSize, int *extractCount);                    // Extract color palette from image to maximum size (memory should be freed)
 RLAPI Image ImageText(const char *text, int fontSize, Color color);                                      // Create an image from text (default font)
 RLAPI Image ImageTextEx(Font font, const char *text, float fontSize, float spacing, Color tint);         // Create an image from text (custom sprite font)
-RLAPI void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec);                         // Draw a source image within a destination image
+RLAPI void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color tint);             // Draw a source image within a destination image (tint applied to source)
 RLAPI void ImageDrawRectangle(Image *dst, Rectangle rec, Color color);                                   // Draw rectangle within an image
 RLAPI void ImageDrawRectangleLines(Image *dst, Rectangle rec, int thick, Color color);                   // Draw rectangle lines within an image
 RLAPI void ImageDrawText(Image *dst, Vector2 position, const char *text, int fontSize, Color color);     // Draw text (default font) within an image (destination)
@@ -1159,7 +1166,7 @@ RLAPI Font LoadFont(const char *fileName);                                      
 RLAPI Font LoadFontEx(const char *fileName, int fontSize, int *fontChars, int charsCount);  // Load font from file with extended parameters
 RLAPI Font LoadFontFromImage(Image image, Color key, int firstChar);                        // Load font from Image (XNA style)
 RLAPI CharInfo *LoadFontData(const char *fileName, int fontSize, int *fontChars, int charsCount, int type); // Load font data for further use
-RLAPI Image GenImageFontAtlas(CharInfo *chars, int charsCount, int fontSize, int padding, int packMethod);  // Generate image font atlas using chars info
+RLAPI Image GenImageFontAtlas(const CharInfo *chars, Rectangle **recs, int charsCount, int fontSize, int padding, int packMethod);  // Generate image font atlas using chars info
 RLAPI void UnloadFont(Font font);                                                           // Unload Font from GPU memory (VRAM)
 
 // Text drawing functions
@@ -1174,8 +1181,8 @@ RLAPI void DrawTextRecEx(Font font, const char *text, Rectangle rec, float fontS
 RLAPI int MeasureText(const char *text, int fontSize);                                      // Measure string width for default font
 RLAPI Vector2 MeasureTextEx(Font font, const char *text, float fontSize, float spacing);    // Measure string size for Font
 RLAPI int GetGlyphIndex(Font font, int character);                                          // Get index position for a unicode character on font
-RLAPI int GetNextCodepoint(const char *text, int *count);                                   // Returns next codepoint in a UTF8 encoded string
-                                                                                            // NOTE: 0x3f(`?`) is returned on failure, `count` will hold the total number of bytes processed
+RLAPI int GetNextCodepoint(const char *text, int *bytesProcessed);                          // Returns next codepoint in a UTF8 encoded string
+                                                                                            // NOTE: 0x3f('?') is returned on failure
 
 // Text strings management functions
 // NOTE: Some strings allocate memory internally for returned strings, just be careful!
@@ -1184,8 +1191,8 @@ RLAPI unsigned int TextLength(const char *text);                                
 RLAPI unsigned int TextCountCodepoints(const char *text);                                   // Get total number of characters (codepoints) in a UTF8 encoded string
 RLAPI const char *TextFormat(const char *text, ...);                                        // Text formatting with variables (sprintf style)
 RLAPI const char *TextSubtext(const char *text, int position, int length);                  // Get a piece of a text string
-RLAPI const char *TextReplace(char *text, const char *replace, const char *by);             // Replace text string (memory should be freed!)
-RLAPI const char *TextInsert(const char *text, const char *insert, int position);           // Insert text in a position (memory should be freed!)
+RLAPI char *TextReplace(char *text, const char *replace, const char *by);                   // Replace text string (memory should be freed!)
+RLAPI char *TextInsert(const char *text, const char *insert, int position);                 // Insert text in a position (memory should be freed!)
 RLAPI const char *TextJoin(const char **textList, int count, const char *delimiter);        // Join text strings with delimiter
 RLAPI const char **TextSplit(const char *text, char delimiter, int *count);                 // Split text into multiple strings
 RLAPI void TextAppend(char *text, const char *append, int *position);                       // Append text at specific position and move cursor!
@@ -1304,7 +1311,7 @@ RLAPI void SetShaderValueMatrix(Shader shader, int uniformLoc, Matrix mat);     
 RLAPI void SetShaderValueTexture(Shader shader, int uniformLoc, Texture2D texture); // Set shader uniform value for texture
 RLAPI void SetMatrixProjection(Matrix proj);                              // Set a custom projection matrix (replaces internal projection matrix)
 RLAPI void SetMatrixModelview(Matrix view);                               // Set a custom modelview matrix (replaces internal modelview matrix)
-RLAPI Matrix GetMatrixModelview();                                        // Get internal modelview matrix
+RLAPI Matrix GetMatrixModelview(void);                                    // Get internal modelview matrix
 
 // Texture maps generation (PBR)
 // NOTE: Required shaders should be provided
@@ -1325,7 +1332,7 @@ RLAPI void EndScissorMode(void);                                          // End
 RLAPI void InitVrSimulator(void);                       // Init VR simulator for selected device parameters
 RLAPI void CloseVrSimulator(void);                      // Close VR simulator for current device
 RLAPI void UpdateVrTracking(Camera *camera);            // Update VR tracking (position and orientation) and camera
-RLAPI void SetVrConfiguration(VrDeviceInfo info, Shader distortion);      // Set stereo rendering configuration parameters 
+RLAPI void SetVrConfiguration(VrDeviceInfo info, Shader distortion);      // Set stereo rendering configuration parameters
 RLAPI bool IsVrSimulatorReady(void);                    // Detect if VR simulator is ready
 RLAPI void ToggleVrMode(void);                          // Enable/Disable VR experience
 RLAPI void BeginVrDrawing(void);                        // Begin VR simulator stereo rendering
@@ -1343,7 +1350,6 @@ RLAPI void SetMasterVolume(float volume);                             // Set mas
 
 // Wave/Sound loading/unloading functions
 RLAPI Wave LoadWave(const char *fileName);                            // Load wave data from file
-RLAPI Wave LoadWaveEx(void *data, int sampleCount, int sampleRate, int sampleSize, int channels); // Load wave data from raw array data
 RLAPI Sound LoadSound(const char *fileName);                          // Load sound from file
 RLAPI Sound LoadSoundFromWave(Wave wave);                             // Load sound from wave data
 RLAPI void UpdateSound(Sound sound, const void *data, int samplesCount);// Update sound buffer with new data
@@ -1354,9 +1360,12 @@ RLAPI void ExportWaveAsCode(Wave wave, const char *fileName);         // Export 
 
 // Wave/Sound management functions
 RLAPI void PlaySound(Sound sound);                                    // Play a sound
+RLAPI void StopSound(Sound sound);                                    // Stop playing a sound
 RLAPI void PauseSound(Sound sound);                                   // Pause a sound
 RLAPI void ResumeSound(Sound sound);                                  // Resume a paused sound
-RLAPI void StopSound(Sound sound);                                    // Stop playing a sound
+RLAPI void PlaySoundMulti(Sound sound);                               // Play a sound (using multichannel buffer pool)
+RLAPI void StopSoundMulti(void);                                      // Stop any sound playing (using multichannel buffer pool)
+RLAPI int GetSoundsPlaying(void);                                     // Get number of sounds playing in the multichannel
 RLAPI bool IsSoundPlaying(Sound sound);                               // Check if a sound is currently playing
 RLAPI void SetSoundVolume(Sound sound, float volume);                 // Set volume for a sound (1.0 is max level)
 RLAPI void SetSoundPitch(Sound sound, float pitch);                   // Set pitch for a sound (1.0 is base level)

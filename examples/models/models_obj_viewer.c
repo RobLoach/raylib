@@ -13,17 +13,17 @@
 
 #include <string.h>        // Required for: strcpy()
 
-int main()
+int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    int screenWidth = 800;
-    int screenHeight = 450;
+    const int screenWidth = 800;
+    const int screenHeight = 450;
 
     InitWindow(screenWidth, screenHeight, "raylib example - obj viewer");
 
     // Define the camera to look into our 3d world
-    Camera camera = {{ 30.0f, 30.0f, 30.0f }, { 0.0f, 10.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
+    Camera camera = { { 30.0f, 30.0f, 30.0f }, { 0.0f, 10.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, 0 };
 
     Model model = LoadModel("resources/models/turret.obj");                     // Load default model obj
     Texture2D texture = LoadTexture("resources/models/turret_diffuse.png");     // Load default model texture
@@ -37,7 +37,7 @@ int main()
 
     char objFilename[64] = "turret.obj";
 
-    SetTargetFPS(60);   // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
     // Main game loop

@@ -1181,6 +1181,8 @@ void DrawRectangleRoundedLines(Rectangle rec, float roundness, int segments, int
 // Draw a triangle
 void DrawTriangle(Vector2 v1, Vector2 v2, Vector2 v3, Color color)
 {
+    if (rlCheckBufferLimit(4)) rlglDraw();
+    
 #if defined(SUPPORT_QUADS_DRAW_MODE)
     rlEnableTexture(GetShapesTexture().id);
 
@@ -1214,6 +1216,8 @@ void DrawTriangle(Vector2 v1, Vector2 v2, Vector2 v3, Color color)
 // Draw a triangle using lines
 void DrawTriangleLines(Vector2 v1, Vector2 v2, Vector2 v3, Color color)
 {
+    if (rlCheckBufferLimit(6)) rlglDraw();
+    
     rlBegin(RL_LINES);
         rlColor4ub(color.r, color.g, color.b, color.a);
         rlVertex2f(v1.x, v1.y);
@@ -1255,6 +1259,36 @@ void DrawTriangleFan(Vector2 *points, int pointsCount, Color color)
             }
         rlEnd();
         rlDisableTexture();
+    }
+}
+
+// Draw a triangle strip defined by points
+// NOTE: Every new point connects with previous two
+void DrawTriangleStrip(Vector2 *points, int pointsCount, Color color)
+{
+    if (pointsCount >= 3)
+    {
+        if (rlCheckBufferLimit(pointsCount)) rlglDraw();
+
+        rlBegin(RL_TRIANGLES);
+            rlColor4ub(color.r, color.g, color.b, color.a);
+
+            for (int i = 2; i < pointsCount; i++)
+            {
+                if ((i%2) == 0)
+                {
+                    rlVertex2f(points[i].x, points[i].y);
+                    rlVertex2f(points[i - 2].x, points[i - 2].y);
+                    rlVertex2f(points[i - 1].x, points[i - 1].y);
+                }
+                else
+                {
+                    rlVertex2f(points[i].x, points[i].y);
+                    rlVertex2f(points[i - 1].x, points[i - 1].y);
+                    rlVertex2f(points[i - 2].x, points[i - 2].y);
+                }
+            }
+        rlEnd();
     }
 }
 
@@ -1474,9 +1508,10 @@ Rectangle GetCollisionRec(Rectangle rec1, Rectangle rec2)
 // NOTE: Required for DrawLineBezier()
 static float EaseCubicInOut(float t, float b, float c, float d)
 {
-    if ((t /= 0.5f*d) < 1)
-        return 0.5f*c*t*t*t + b;
+    if ((t /= 0.5f*d) < 1) return 0.5f*c*t*t*t + b;
+    
     t -= 2;
+    
     return 0.5f*c*(t*t*t + 2.0f) + b;
 }
 
@@ -1487,7 +1522,7 @@ static Texture2D GetShapesTexture(void)
     {
 #if defined(SUPPORT_FONT_TEXTURE)
         texShapes = GetFontDefault().texture;           // Use font texture white character
-        Rectangle rec = GetFontDefault().chars[95].rec;
+        Rectangle rec = GetFontDefault().recs[95];
         // NOTE: We setup a 1px padding on char rectangle to avoid texture bleeding on MSAA filtering
         recTexShapes = (Rectangle){ rec.x + 1, rec.y + 1, rec.width - 2, rec.height - 2 };
 #else

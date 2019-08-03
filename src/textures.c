@@ -408,7 +408,11 @@ Texture2D LoadTextureFromImage(Image image)
 {
     Texture2D texture = { 0 };
 
-    texture.id = rlLoadTexture(image.data, image.width, image.height, image.format, image.mipmaps);
+    if ((image.data != NULL) && (image.width != 0) && (image.height != 0))
+    {
+        texture.id = rlLoadTexture(image.data, image.width, image.height, image.format, image.mipmaps);
+    }
+    else TraceLog(LOG_WARNING, "Texture could not be loaded from Image");
 
     texture.width = image.width;
     texture.height = image.height;
@@ -746,7 +750,7 @@ Image GetTextureData(Texture2D texture)
 }
 
 // Get pixel data from GPU frontbuffer and return an Image (screenshot)
-RLAPI Image GetScreenData(void)
+Image GetScreenData(void)
 {
     Image image = { 0 };
 
@@ -819,14 +823,15 @@ void ExportImageAsCode(Image image, const char *fileName)
 
     FILE *txtFile = fopen(fileName, "wt");
 
-    fprintf(txtFile, "\n//////////////////////////////////////////////////////////////////////////////////////\n");
+    fprintf(txtFile, "\n");
+    fprintf(txtFile, "////////////////////////////////////////////////////////////////////////////////////////\n");
     fprintf(txtFile, "//                                                                                    //\n");
     fprintf(txtFile, "// ImageAsCode exporter v1.0 - Image pixel data exported as an array of bytes         //\n");
     fprintf(txtFile, "//                                                                                    //\n");
     fprintf(txtFile, "// more info and bugs-report:  github.com/raysan5/raylib                              //\n");
     fprintf(txtFile, "// feedback and support:       ray[at]raylib.com                                      //\n");
     fprintf(txtFile, "//                                                                                    //\n");
-    fprintf(txtFile, "// Copyright (c) 2018 Ramon Santamaria (@raysan5)                                     //\n");
+    fprintf(txtFile, "// Copyright (c) 2019 Ramon Santamaria (@raysan5)                                     //\n");
     fprintf(txtFile, "//                                                                                    //\n");
     fprintf(txtFile, "////////////////////////////////////////////////////////////////////////////////////////\n\n");
 
@@ -884,10 +889,23 @@ Image ImageCopy(Image image)
     return newImage;
 }
 
+// Create an image from another image piece
+Image ImageFromImage(Image image, Rectangle rec)
+{
+    Image result = ImageCopy(image);
+    
+    ImageCrop(&result, rec);
+    
+    return result;
+}
+
 // Convert image to POT (power-of-two)
 // NOTE: It could be useful on OpenGL ES 2.0 (RPI, HTML5)
 void ImageToPOT(Image *image, Color fillColor)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *pixels = GetImageData(*image);   // Get pixels data
 
     // Calculate next power-of-two values
@@ -931,6 +949,9 @@ void ImageToPOT(Image *image, Color fillColor)
 // Convert image data to desired format
 void ImageFormat(Image *image, int newFormat)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     if ((newFormat != 0) && (image->format != newFormat))
     {
         if ((image->format < COMPRESSED_DXT1_RGB) && (newFormat < COMPRESSED_DXT1_RGB))
@@ -1153,6 +1174,9 @@ void ImageAlphaMask(Image *image, Image alphaMask)
 // NOTE: Threshold defines the alpha limit, 0.0f to 1.0f
 void ImageAlphaClear(Image *image, Color color, float threshold)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *pixels = GetImageData(*image);
 
     for (int i = 0; i < image->width*image->height; i++) if (pixels[i].a <= (unsigned char)(threshold*255.0f)) pixels[i] = color;
@@ -1168,6 +1192,9 @@ void ImageAlphaClear(Image *image, Color color, float threshold)
 // Premultiply alpha channel
 void ImageAlphaPremultiply(Image *image)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     float alpha = 0.0f;
     Color *pixels = GetImageData(*image);
 
@@ -1258,7 +1285,7 @@ TextureCubemap LoadTextureCubemap(Image image, int layoutType)
             // TODO: Image formating does not work with compressed textures!
         }
 
-        for (int i = 0; i < 6; i++) ImageDraw(&faces, image, faceRecs[i], (Rectangle){ 0, size*i, size, size });
+        for (int i = 0; i < 6; i++) ImageDraw(&faces, image, faceRecs[i], (Rectangle){ 0, size*i, size, size }, WHITE);
 
         cubemap.id = rlLoadTextureCubemap(faces.data, size, faces.format);
         if (cubemap.id == 0) TraceLog(LOG_WARNING, "Cubemap image could not be loaded.");
@@ -1274,6 +1301,9 @@ TextureCubemap LoadTextureCubemap(Image image, int layoutType)
 // NOTE: Security checks are performed in case rectangle goes out of bounds
 void ImageCrop(Image *image, Rectangle crop)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     // Security checks to make sure cropping rectangle is inside margins
     if ((crop.x + crop.width) > image->width)
     {
@@ -1323,6 +1353,9 @@ void ImageCrop(Image *image, Rectangle crop)
 // Crop image depending on alpha value
 void ImageAlphaCrop(Image *image, float threshold)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *pixels = GetImageData(*image);
 
     int xMin = 65536;   // Define a big enough number
@@ -1358,6 +1391,9 @@ void ImageAlphaCrop(Image *image, float threshold)
 // STBIR_DEFAULT_FILTER_DOWNSAMPLE  STBIR_FILTER_MITCHELL   (high-quality Catmull-Rom)
 void ImageResize(Image *image, int newWidth, int newHeight)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     // Get data as Color pixels array to work with it
     Color *pixels = GetImageData(*image);
     Color *output = (Color *)RL_MALLOC(newWidth*newHeight*sizeof(Color));
@@ -1379,6 +1415,9 @@ void ImageResize(Image *image, int newWidth, int newHeight)
 // Resize and image to new size using Nearest-Neighbor scaling algorithm
 void ImageResizeNN(Image *image,int newWidth,int newHeight)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *pixels = GetImageData(*image);
     Color *output = (Color *)RL_MALLOC(newWidth*newHeight*sizeof(Color));
 
@@ -1411,27 +1450,51 @@ void ImageResizeNN(Image *image,int newWidth,int newHeight)
 
 // Resize canvas and fill with color
 // NOTE: Resize offset is relative to the top-left corner of the original image
-void ImageResizeCanvas(Image *image, int newWidth,int newHeight, int offsetX, int offsetY, Color color)
+void ImageResizeCanvas(Image *image, int newWidth, int newHeight, int offsetX, int offsetY, Color color)
 {
-    // TODO: Review different scaling situations
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
 
     if ((newWidth != image->width) || (newHeight != image->height))
     {
+        // Support offsets out of canvas new size -> original image is cropped
+        if (offsetX < 0)
+        {
+            ImageCrop(image, (Rectangle) { -offsetX, 0, image->width + offsetX, image->height });
+            offsetX = 0;
+        }
+        else if (offsetX > (newWidth - image->width))
+        {
+            ImageCrop(image, (Rectangle) { 0, 0, image->width - (offsetX - (newWidth - image->width)), image->height });
+            offsetX = newWidth - image->width;
+        }
+
+        if (offsetY < 0)
+        {
+            ImageCrop(image, (Rectangle) { 0, -offsetY, image->width, image->height + offsetY });
+            offsetY = 0;
+        }
+        else if (offsetY > (newHeight - image->height))
+        {
+            ImageCrop(image, (Rectangle) { 0, 0, image->width, image->height - (offsetY - (newHeight - image->height)) });
+            offsetY = newHeight - image->height;
+        }
+
         if ((newWidth > image->width) && (newHeight > image->height))
         {
             Image imTemp = GenImageColor(newWidth, newHeight, color);
 
             Rectangle srcRec = { 0.0f, 0.0f, (float)image->width, (float)image->height };
-            Rectangle dstRec = { (float)offsetX, (float)offsetY, (float)srcRec.width, (float)srcRec.height };
+            Rectangle dstRec = { (float)offsetX, (float)offsetY, srcRec.width, srcRec.height };
 
-            ImageDraw(&imTemp, *image, srcRec, dstRec);
+            ImageDraw(&imTemp, *image, srcRec, dstRec, WHITE);
             ImageFormat(&imTemp, image->format);
             UnloadImage(*image);
             *image = imTemp;
         }
         else if ((newWidth < image->width) && (newHeight < image->height))
         {
-            Rectangle crop = { (float)offsetX, (float)offsetY, newWidth, newHeight };
+            Rectangle crop = { (float)offsetX, (float)offsetY, (float)newWidth, (float)newHeight };
             ImageCrop(image, crop);
         }
         else    // One side is bigger and the other is smaller
@@ -1439,13 +1502,12 @@ void ImageResizeCanvas(Image *image, int newWidth,int newHeight, int offsetX, in
             Image imTemp = GenImageColor(newWidth, newHeight, color);
 
             Rectangle srcRec = { 0.0f, 0.0f, (float)image->width, (float)image->height };
-            Rectangle dstRec = { (float)offsetX, (float)offsetY, (float)newWidth, (float)newHeight };
+            Rectangle dstRec = { (float)offsetX, (float)offsetY, (float)image->width, (float)image->height };
 
             if (newWidth < image->width)
             {
                 srcRec.x = offsetX;
                 srcRec.width = newWidth;
-
                 dstRec.x = 0.0f;
             }
 
@@ -1453,12 +1515,10 @@ void ImageResizeCanvas(Image *image, int newWidth,int newHeight, int offsetX, in
             {
                 srcRec.y = offsetY;
                 srcRec.height = newHeight;
-
                 dstRec.y = 0.0f;
             }
 
-            // TODO: ImageDraw() could be buggy?
-            ImageDraw(&imTemp, *image, srcRec, dstRec);
+            ImageDraw(&imTemp, *image, srcRec, dstRec, WHITE);
             ImageFormat(&imTemp, image->format);
             UnloadImage(*image);
             *image = imTemp;
@@ -1472,6 +1532,9 @@ void ImageResizeCanvas(Image *image, int newWidth,int newHeight, int offsetX, in
 // NOTE 3: Mipmaps format is the same as base image
 void ImageMipmaps(Image *image)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     int mipCount = 1;                   // Required mipmap levels count (including base level)
     int mipWidth = image->width;        // Base image width
     int mipHeight = image->height;      // Base image height
@@ -1546,6 +1609,9 @@ void ImageMipmaps(Image *image)
 // dithered data is stored in the LSB part of the unsigned short
 void ImageDither(Image *image, int rBpp, int gBpp, int bBpp, int aBpp)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     if (image->format >= COMPRESSED_DXT1_RGB)
     {
         TraceLog(LOG_WARNING, "Compressed data formats can not be dithered");
@@ -1702,10 +1768,12 @@ Color *ImageExtractPalette(Image image, int maxPaletteSize, int *extractCount)
 }
 
 // Draw an image (source) within an image (destination)
-// TODO: Feel this function could be simplified...
-void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec)
+// NOTE: Color tint is applied to source image
+void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec, Color tint)
 {
-    bool cropRequired = false;
+    // Security check to avoid program crash
+    if ((dst->data == NULL) || (dst->width == 0) || (dst->height == 0) ||
+        (src.data == NULL) || (src.width == 0) || (src.height == 0)) return;
 
     // Security checks to avoid size and rectangle issues (out of bounds)
     // Check that srcRec is inside src image
@@ -1727,45 +1795,51 @@ void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec)
     Image srcCopy = ImageCopy(src);     // Make a copy of source image to work with it
     ImageCrop(&srcCopy, srcRec);        // Crop source image to desired source rectangle
 
-    // Check that dstRec is inside dst image
-    // TODO: Allow negative position within destination with cropping
-    if (dstRec.x < 0) dstRec.x = 0;
-    if (dstRec.y < 0) dstRec.y = 0;
-
     // Scale source image in case destination rec size is different than source rec size
-    if ((dstRec.width != srcRec.width) || (dstRec.height != srcRec.height)) ImageResize(&srcCopy, (int)dstRec.width, (int)dstRec.height);
-
+    if (((int)dstRec.width != (int)srcRec.width) || ((int)dstRec.height != (int)srcRec.height))
+    {
+        ImageResize(&srcCopy, (int)dstRec.width, (int)dstRec.height);
+    }
+    
+    // Check that dstRec is inside dst image
+    // Allow negative position within destination with cropping
+    if (dstRec.x < 0)
+    {
+        ImageCrop(&srcCopy, (Rectangle) { -dstRec.x, 0, dstRec.width + dstRec.x, dstRec.height });
+        dstRec.width = dstRec.width + dstRec.x;
+        dstRec.x = 0;
+    }
+    
     if ((dstRec.x + dstRec.width) > dst->width)
     {
+        ImageCrop(&srcCopy, (Rectangle) { 0, 0, dst->width - dstRec.x, dstRec.height });
         dstRec.width = dst->width - dstRec.x;
-        TraceLog(LOG_WARNING, "Destination rectangle width out of bounds, rescaled width: %i", dstRec.width);
-        cropRequired = true;
     }
 
-    if ((dstRec.y + dstRec.height) > dst->height)
+    if (dstRec.y < 0)
     {
+        ImageCrop(&srcCopy, (Rectangle) { 0, -dstRec.y, dstRec.width, dstRec.height + dstRec.y });
+        dstRec.height = dstRec.height + dstRec.y;
+        dstRec.y = 0;
+    }
+    
+    if (dstRec.y > (dst->height - dstRec.height))
+    {
+        ImageCrop(&srcCopy, (Rectangle) { 0, 0, dstRec.width, dst->height - dstRec.y });
         dstRec.height = dst->height - dstRec.y;
-        TraceLog(LOG_WARNING, "Destination rectangle height out of bounds, rescaled height: %i", dstRec.height);
-        cropRequired = true;
-    }
-
-    if (cropRequired)
-    {
-        // Crop destination rectangle if out of bounds
-        Rectangle crop = { 0, 0, dstRec.width, dstRec.height };
-        ImageCrop(&srcCopy, crop);
     }
 
     // Get image data as Color pixels array to work with it
     Color *dstPixels = GetImageData(*dst);
     Color *srcPixels = GetImageData(srcCopy);
 
-    UnloadImage(srcCopy);       // Source copy not required any more...
+    UnloadImage(srcCopy);       // Source copy not required any more
 
-    Vector4 fsrc, fdst, fout;   // float based versions of pixel data
+    Vector4 fsrc, fdst, fout;   // Normalized pixel data (ready for operation)
+    Vector4 ftint = ColorNormalize(tint);   // Normalized color tint
 
     // Blit pixels, copy source image into destination
-    // TODO: Probably out-of-bounds blitting could be considered here instead of so much cropping...
+    // TODO: Maybe out-of-bounds blitting could be considered here instead of so much cropping
     for (int j = (int)dstRec.y; j < (int)(dstRec.y + dstRec.height); j++)
     {
         for (int i = (int)dstRec.x; i < (int)(dstRec.x + dstRec.width); i++)
@@ -1774,6 +1848,9 @@ void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec)
 
             fdst = ColorNormalize(dstPixels[j*(int)dst->width + i]);
             fsrc = ColorNormalize(srcPixels[(j - (int)dstRec.y)*(int)dstRec.width + (i - (int)dstRec.x)]);
+            
+            // Apply color tint to source image
+            fsrc.x *= ftint.x; fsrc.y *= ftint.y; fsrc.z *= ftint.z; fsrc.w *= ftint.w;
 
             fout.w = fsrc.w + fdst.w*(1.0f - fsrc.w);
 
@@ -1799,7 +1876,7 @@ void ImageDraw(Image *dst, Image src, Rectangle srcRec, Rectangle dstRec)
         }
     }
 
-    UnloadImage(*dst);  // NOTE: Only dst->data is unloaded
+    UnloadImage(*dst);
 
     *dst = LoadImageEx(dstPixels, (int)dst->width, (int)dst->height);
     ImageFormat(dst, dst->format);
@@ -1824,64 +1901,43 @@ Image ImageText(const char *text, int fontSize, Color color)
 Image ImageTextEx(Font font, const char *text, float fontSize, float spacing, Color tint)
 {
     int length = strlen(text);
-    int posX = 0;
+
     int index;                  // Index position in sprite font
-    unsigned char character;    // Current character
+    int letter = 0;             // Current character
+    int positionX = 0;          // Image drawing position
 
+    // NOTE: Text image is generated at font base size, later scaled to desired font size
     Vector2 imSize = MeasureTextEx(font, text, (float)font.baseSize, spacing);
-
-    TraceLog(LOG_DEBUG, "Text Image size: %f, %f", imSize.x, imSize.y);
-
-    // NOTE: glGetTexImage() not available in OpenGL ES
-    // TODO: This is horrible, retrieving font texture from GPU!!!
-    // Define ImageFont struct? or include Image spritefont in Font struct?
-    Image imFont = GetTextureData(font.texture);
-
-    ImageFormat(&imFont, UNCOMPRESSED_R8G8B8A8);    // Make sure image format could be properly colored!
-
-    ImageColorTint(&imFont, tint);                  // Apply color tint to font
 
     // Create image to store text
     Image imText = GenImageColor((int)imSize.x, (int)imSize.y, BLANK);
-
+    
     for (int i = 0; i < length; i++)
     {
-        if ((unsigned char)text[i] == '\n')
+        int next = 0;
+        letter = GetNextCodepoint(&text[i], &next);
+        index = GetGlyphIndex(font, letter);
+        
+        if (letter == 0x3f) next = 1; 
+        i += (next - 1);
+        
+        if (letter == '\n')
         {
             // TODO: Support line break
         }
         else
         {
-            if ((unsigned char)text[i] == 0xc2)         // UTF-8 encoding identification HACK!
+            if (letter != ' ')
             {
-                // Support UTF-8 encoded values from [0xc2 0x80] -> [0xc2 0xbf](¿)
-                character = (unsigned char)text[i + 1];
-                index = GetGlyphIndex(font, (int)character);
-                i++;
-            }
-            else if ((unsigned char)text[i] == 0xc3)    // UTF-8 encoding identification HACK!
-            {
-                // Support UTF-8 encoded values from [0xc3 0x80](À) -> [0xc3 0xbf](ÿ)
-                character = (unsigned char)text[i + 1];
-                index = GetGlyphIndex(font, (int)character + 64);
-                i++;
-            }
-            else index = GetGlyphIndex(font, (unsigned char)text[i]);
-
-            CharInfo letter = font.chars[index];
-
-            if ((unsigned char)text[i] != ' ')
-            {
-                ImageDraw(&imText, imFont, letter.rec, (Rectangle){ (float)(posX + letter.offsetX),
-                    (float)letter.offsetY, (float)letter.rec.width, (float)letter.rec.height });
+                ImageDraw(&imText, font.chars[index].image, (Rectangle){ 0, 0, font.chars[index].image.width, font.chars[index].image.height },
+                         (Rectangle){ (float)(positionX + font.chars[index].offsetX),(float)font.chars[index].offsetY, 
+                                      font.chars[index].image.width, font.chars[index].image.height }, tint);
             }
 
-            if (letter.advanceX == 0) posX += (int)(letter.rec.width + spacing);
-            else posX += letter.advanceX + (int)spacing;
+            if (font.chars[index].advanceX == 0) positionX += (int)(font.recs[index].width + spacing);
+            else positionX += font.chars[index].advanceX + (int)spacing;
         }
     }
-
-    UnloadImage(imFont);
 
     // Scale image depending on text size
     if (fontSize > imSize.y)
@@ -1900,8 +1956,11 @@ Image ImageTextEx(Font font, const char *text, float fontSize, float spacing, Co
 // Draw rectangle within an image
 void ImageDrawRectangle(Image *dst, Rectangle rec, Color color)
 {
+    // Security check to avoid program crash
+    if ((dst->data == NULL) || (dst->width == 0) || (dst->height == 0)) return;
+
     Image imRec = GenImageColor((int)rec.width, (int)rec.height, color);
-    ImageDraw(dst, imRec, (Rectangle){ 0, 0, rec.width, rec.height }, rec);
+    ImageDraw(dst, imRec, (Rectangle){ 0, 0, rec.width, rec.height }, rec, WHITE);
     UnloadImage(imRec);
 }
 
@@ -1929,7 +1988,7 @@ void ImageDrawTextEx(Image *dst, Vector2 position, Font font, const char *text, 
     Rectangle srcRec = { 0.0f, 0.0f, (float)imText.width, (float)imText.height };
     Rectangle dstRec = { position.x, position.y, (float)imText.width, (float)imText.height };
 
-    ImageDraw(dst, imText, srcRec, dstRec);
+    ImageDraw(dst, imText, srcRec, dstRec, WHITE);
 
     UnloadImage(imText);
 }
@@ -1937,6 +1996,9 @@ void ImageDrawTextEx(Image *dst, Vector2 position, Font font, const char *text, 
 // Flip image vertically
 void ImageFlipVertical(Image *image)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *srcPixels = GetImageData(*image);
     Color *dstPixels = (Color *)RL_MALLOC(image->width*image->height*sizeof(Color));
 
@@ -1961,6 +2023,9 @@ void ImageFlipVertical(Image *image)
 // Flip image horizontally
 void ImageFlipHorizontal(Image *image)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *srcPixels = GetImageData(*image);
     Color *dstPixels = (Color *)RL_MALLOC(image->width*image->height*sizeof(Color));
 
@@ -1985,6 +2050,9 @@ void ImageFlipHorizontal(Image *image)
 // Rotate image clockwise 90deg
 void ImageRotateCW(Image *image)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *srcPixels = GetImageData(*image);
     Color *rotPixels = (Color *)RL_MALLOC(image->width*image->height*sizeof(Color));
 
@@ -2011,6 +2079,9 @@ void ImageRotateCW(Image *image)
 // Rotate image counter-clockwise 90deg
 void ImageRotateCCW(Image *image)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *srcPixels = GetImageData(*image);
     Color *rotPixels = (Color *)RL_MALLOC(image->width*image->height*sizeof(Color));
 
@@ -2037,6 +2108,9 @@ void ImageRotateCCW(Image *image)
 // Modify image color: tint
 void ImageColorTint(Image *image, Color color)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *pixels = GetImageData(*image);
 
     float cR = (float)color.r/255;
@@ -2072,6 +2146,9 @@ void ImageColorTint(Image *image, Color color)
 // Modify image color: invert
 void ImageColorInvert(Image *image)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *pixels = GetImageData(*image);
 
     for (int y = 0; y < image->height; y++)
@@ -2102,6 +2179,9 @@ void ImageColorGrayscale(Image *image)
 // NOTE: Contrast values between -100 and 100
 void ImageColorContrast(Image *image, float contrast)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     if (contrast < -100) contrast = -100;
     if (contrast > 100) contrast = 100;
 
@@ -2156,6 +2236,9 @@ void ImageColorContrast(Image *image, float contrast)
 // NOTE: Brightness values between -255 and 255
 void ImageColorBrightness(Image *image, int brightness)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     if (brightness < -255) brightness = -255;
     if (brightness > 255) brightness = 255;
 
@@ -2195,6 +2278,9 @@ void ImageColorBrightness(Image *image, int brightness)
 // Modify image color: replace color
 void ImageColorReplace(Image *image, Color color, Color replace)
 {
+    // Security check to avoid program crash
+    if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
+
     Color *pixels = GetImageData(*image);
 
     for (int y = 0; y < image->height; y++)
@@ -2573,7 +2659,7 @@ void DrawTextureEx(Texture2D texture, Vector2 position, float rotation, float sc
 // Draw a part of a texture (defined by a rectangle)
 void DrawTextureRec(Texture2D texture, Rectangle sourceRec, Vector2 position, Color tint)
 {
-    Rectangle destRec = { position.x, position.y, sourceRec.width, (float)fabs(sourceRec.height) };
+    Rectangle destRec = { position.x, position.y, (float)fabs(sourceRec.width), (float)fabs(sourceRec.height) };
     Vector2 origin = { 0.0f, 0.0f };
 
     DrawTexturePro(texture, sourceRec, destRec, origin, 0.0f, tint);
@@ -2599,8 +2685,10 @@ void DrawTexturePro(Texture2D texture, Rectangle sourceRec, Rectangle destRec, V
     {
         float width = (float)texture.width;
         float height = (float)texture.height;
-
-        if (sourceRec.width < 0) sourceRec.x -= sourceRec.width;
+        
+        bool flipX = false;
+        
+        if (sourceRec.width < 0) { flipX = true; sourceRec.width *= -1; }
         if (sourceRec.height < 0) sourceRec.y -= sourceRec.height;
 
         rlEnableTexture(texture.id);
@@ -2615,19 +2703,23 @@ void DrawTexturePro(Texture2D texture, Rectangle sourceRec, Rectangle destRec, V
                 rlNormal3f(0.0f, 0.0f, 1.0f);                          // Normal vector pointing towards viewer
 
                 // Bottom-left corner for texture and quad
-                rlTexCoord2f(sourceRec.x/width, sourceRec.y/height);
+                if (flipX) rlTexCoord2f((sourceRec.x + sourceRec.width)/width, sourceRec.y/height);
+                else rlTexCoord2f(sourceRec.x/width, sourceRec.y/height);
                 rlVertex2f(0.0f, 0.0f);
 
                 // Bottom-right corner for texture and quad
-                rlTexCoord2f(sourceRec.x/width, (sourceRec.y + sourceRec.height)/height);
+                if (flipX) rlTexCoord2f((sourceRec.x + sourceRec.width)/width, (sourceRec.y + sourceRec.height)/height);
+                else rlTexCoord2f(sourceRec.x/width, (sourceRec.y + sourceRec.height)/height);
                 rlVertex2f(0.0f, destRec.height);
 
                 // Top-right corner for texture and quad
-                rlTexCoord2f((sourceRec.x + sourceRec.width)/width, (sourceRec.y + sourceRec.height)/height);
+                if (flipX) rlTexCoord2f(sourceRec.x/width, (sourceRec.y + sourceRec.height)/height);
+                else rlTexCoord2f((sourceRec.x + sourceRec.width)/width, (sourceRec.y + sourceRec.height)/height);
                 rlVertex2f(destRec.width, destRec.height);
 
                 // Top-left corner for texture and quad
-                rlTexCoord2f((sourceRec.x + sourceRec.width)/width, sourceRec.y/height);
+                if (flipX) rlTexCoord2f(sourceRec.x/width, sourceRec.y/height);
+                else rlTexCoord2f((sourceRec.x + sourceRec.width)/width, sourceRec.y/height);
                 rlVertex2f(destRec.width, 0.0f);
             rlEnd();
         rlPopMatrix();
