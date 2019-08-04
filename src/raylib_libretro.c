@@ -71,7 +71,7 @@ static void libretroPollInputEvents() {
  */
 void retro_init(void)
 {
-	InitWindow(state.width, state.height, "raylib [core] example - libretro")
+	InitWindow(state.width, state.height, "raylib [core] example - libretro");
 	SetTargetFPS(state.fps);
 }
 

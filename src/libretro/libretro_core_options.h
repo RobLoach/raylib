@@ -37,7 +37,7 @@ struct retro_core_option_definition option_defs_us[] = {
 			{ NULL, NULL },
 		},
 		"disabled"
-	}
+	},
 	{ NULL, NULL, NULL, {{0}}, NULL },
 };
 
