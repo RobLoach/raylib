@@ -273,7 +273,7 @@
 #endif
 
 #if defined(PLATFORM_LIBRETRO)
-    #include "external/libretro-common/include/libretro.h"
+    #include "libretro/raylib_libretro.h"
 #endif
 
 #define MAX_GAMEPADS              4         // Max number of gamepads supported
@@ -361,7 +361,7 @@ static bool cursorHidden = false;               // Track if cursor is hidden
 static bool cursorOnScreen = false;             // Tracks if cursor is inside client area
 static Vector2 touchPosition[MAX_TOUCH_POINTS]; // Touch position on screen
 
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_RPI) || defined(PLATFORM_WEB) || defined(PLATFORM_UWP)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_RPI) || defined(PLATFORM_WEB) || defined(PLATFORM_UWP) || defined(PLATFORM_LIBRETRO)
 static char previousMouseState[3] = { 0 };      // Registers previous mouse button state
 static char currentMouseState[3] = { 0 };       // Registers current mouse button state
 static int previousMouseWheelY = 0;             // Registers previous mouse wheel variation
@@ -404,7 +404,7 @@ static bool toggleCursorLock = false;           // Ask for cursor pointer lock o
 static int lastGamepadButtonPressed = -1;       // Register last gamepad button pressed
 static int gamepadAxisCount = 0;                // Register number of available gamepad axis
 
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_RPI) || defined(PLATFORM_WEB) || defined(PLATFORM_UWP)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_RPI) || defined(PLATFORM_WEB) || defined(PLATFORM_UWP) || defined(PLATFORM_LIBRETRO)
 static bool gamepadReady[MAX_GAMEPADS] = { false };             // Flag to know if gamepad is ready
 static float gamepadAxisState[MAX_GAMEPADS][MAX_GAMEPAD_AXIS];  // Gamepad axis state
 static char previousGamepadState[MAX_GAMEPADS][MAX_GAMEPAD_BUTTONS];    // Previous gamepad buttons state
@@ -782,6 +782,10 @@ void CloseWindow(void)
     if (gamepadThreadId) pthread_join(gamepadThreadId, NULL);
 #endif
 
+#if defined(PLATFORM_LIBRETRO)
+    libretroCloseWindow();
+#endif
+
     TraceLog(LOG_INFO, "Window closed successfully");
 }
 
@@ -935,6 +939,9 @@ void SetWindowSize(int width, int height)
 {
 #if defined(PLATFORM_DESKTOP)
     glfwSetWindowSize(window, width, height);
+#endif
+#if defined(PLATFORM_LIBRETRO)
+    libretroSetWindowSize(width, height);
 #endif
 }
 
@@ -1229,6 +1236,10 @@ void EndDrawing(void)
     SwapBuffers();                  // Copy back buffer to front buffer
     PollInputEvents();              // Poll user events
 
+#if defined(PLATFORM_LIBRETRO)
+    libretroEndDrawing();
+#endif
+
     // Frame time control system
     currentTime = GetTime();
     drawTime = currentTime - previousTime;
@@ -1486,6 +1497,10 @@ void SetTargetFPS(int fps)
 {
     if (fps < 1) targetTime = 0.0;
     else targetTime = 1.0/(double)fps;
+
+#if defined(PLATFORM_LIBRETRO)
+    libretroSetTargetFPS(fps);
+#endif
 
     TraceLog(LOG_INFO, "Target time per frame: %02.03f milliseconds", (float)targetTime*1000);
 }
@@ -2958,6 +2973,10 @@ static bool InitGraphicsDevice(int width, int height)
     //---------------------------------------------------------------------------------
 #endif  // PLATFORM_RPI
 
+#if defined(PLATFORM_LIBRETRO)
+    libretroSetWindowSize(width, height);
+#endif
+
     // There must be at least one frame displayed before the buffers are swapped
     //eglSwapInterval(display, 1);
 
@@ -3627,6 +3646,14 @@ static void PollInputEvents(void)
 
     // NOTE: Mouse input events polling is done asynchronously in another pthread - EventThread()
     // NOTE: Gamepad (Joystick) input events polling is done asynchonously in another pthread - GamepadThread()
+#endif
+
+#if defined(PLATFORM_LIBRETRO)
+    libretroPollInputEvents();
+
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        // TODO: libretro: Fill in the gamepad.
+    }
 #endif
 }
 
