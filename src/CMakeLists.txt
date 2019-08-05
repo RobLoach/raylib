@@ -26,7 +26,7 @@ endif()
 
 # Explicitly check against "ON", because USE_EXTERNAL_GLFW is a tristate option
 if(NOT glfw3_FOUND AND NOT USE_EXTERNAL_GLFW STREQUAL "ON" AND "${PLATFORM}" MATCHES "Desktop")
-  MESSAGE(STATUS "Using raylib's GLFW")
+  message(WARNING "Using raylib's GLFW")
   set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
   set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -120,7 +120,8 @@ elseif(${PLATFORM} MATCHES "Raspberry Pi")
 elseif(${PLATFORM} MATCHES "libretro")
   set(PLATFORM_CPP "PLATFORM_LIBRETRO")
   set(GRAPHICS "GRAPHICS_API_OPENGL_33")
-  #find_library(pthread NAMES pthread)
+  find_library(pthread NAMES pthread)
+  find_library(m NAMES m)
   find_package(OpenGL QUIET)
   if ("${OPENGL_LIBRARIES}" STREQUAL "")
     set(OPENGL_LIBRARIES "GL")
@@ -131,6 +132,15 @@ elseif(${PLATFORM} MATCHES "libretro")
   endif()
 
   set(LIBS_PRIVATE m pthread ${OPENGL_LIBRARIES} ${OSS_LIBRARY})
+
+  add_library(raylib_libretro STATIC
+    ${sources}
+  )
+  if(ANDROID)
+    set_target_properties(raylib_libretro PROPERTIES SUFFIX "_android.so")
+  endif()
+  set_target_properties(raylib_libretro PROPERTIES PREFIX "")
+  target_link_libraries(raylib_libretro raylib_static)
 
 endif()
 
